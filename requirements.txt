@@ -1,0 +1,8 @@
+librosa==0.10.0
+numpy==2.3.5
+opencv_python==4.8.1.78
+opencv_python_headless==4.13.0.90
+pandas==2.3.3
+scikit_learn==1.8.0
+torch==2.9.1
+transformers==4.57.6
