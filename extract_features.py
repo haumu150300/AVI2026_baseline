@@ -9,12 +9,12 @@ from transformers import CLIPProcessor, CLIPModel, WhisperProcessor, WhisperMode
 warnings.filterwarnings('ignore')
 
 # 基础配置
-device = "cuda" if torch.cuda.is_available() else "cpu"
-BASE_DIR = "/root/autodl-tmp/val_data"
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+BASE_DIR = "/home/orisu/avi2026/dataset/train_data"
 BASE_VIDEO_DIR = BASE_DIR
-BASE_AUDIO_DIR = "/root/autodl-tmp/val_audio"
-BASE_TEXT_DIR  = "/root/autodl-tmp/val_text"
-FEATURE_DIR = "/root/autodl-tmp/val_feature"
+BASE_AUDIO_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/train_audio"
+BASE_TEXT_DIR  = "/home/orisu/avi2026/dataset/autodl-tmp/train_text"
+FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/train_feature"
 os.makedirs(os.path.join(FEATURE_DIR, "video"), exist_ok=True)
 os.makedirs(os.path.join(FEATURE_DIR, "audio"), exist_ok=True)
 os.makedirs(os.path.join(FEATURE_DIR, "text"), exist_ok=True)
@@ -94,6 +94,7 @@ def extract_text_feature(text_path):
 
 def batch_extract_features():
     users = set(f.split("_")[0] for f in os.listdir(BASE_DIR))
+    print(f"Found {len(users)} unique users for feature extraction.")
     for user in users:
         for q in TASK2_QS:
             video_path = get_video_path(user, q)
@@ -110,4 +111,5 @@ def batch_extract_features():
 
 
 if __name__ == "__main__":
+    print('Starting feature extraction...')
     batch_extract_features()

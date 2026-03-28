@@ -2,9 +2,9 @@ import os
 import numpy as np
 import pandas as pd
 
-FEATURE_DIR = "/root/autodl-tmp/train_feature"
-BASE_DIR = "/root/autodl-tmp/train_data"
-LABEL_FILE = "/root/autodl-tmp/train_data.csv"
+FEATURE_DIR = "/home/orisu/avi2026/dataset/train_feature"
+BASE_DIR = "/home/orisu/avi2026/dataset/train_data"
+LABEL_FILE = "/home/orisu/avi2026/dataset/train_data.csv"
 TASK1_QS = ["q3", "q4", "q5", "q6"]
 TASK2_QS = ["q1", "q2", "q3", "q4", "q5", "q6"]
 
