@@ -14,7 +14,7 @@ BASE_DIR = "/home/orisu/avi2026/dataset/val_data"
 BASE_VIDEO_DIR = BASE_DIR
 BASE_AUDIO_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/val_audio"
 BASE_TEXT_DIR  = "/home/orisu/avi2026/dataset/autodl-tmp/val_text"
-FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/val_feature"
+FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/val_feature_token"
 os.makedirs(os.path.join(FEATURE_DIR, "video"), exist_ok=True)
 os.makedirs(os.path.join(FEATURE_DIR, "audio"), exist_ok=True)
 os.makedirs(os.path.join(FEATURE_DIR, "text"), exist_ok=True)
@@ -70,14 +70,14 @@ def extract_visual_feature(video_path):
     inputs = clip_processor(images=frames, return_tensors="pt").to(device)
     with torch.no_grad():
         feat = clip_model.get_image_features(**inputs)
-    return torch.max(feat, dim=0).values.cpu().numpy()
+    return feat.cpu().numpy()
 
 def extract_audio_feature(audio_path):
     waveform, sr = librosa.load(audio_path, sr=16000)
     inputs = whisper_processor(waveform, sampling_rate=16000, return_tensors="pt").to(device)
     with torch.no_grad():
         feat = whisper_model.encoder(**inputs).last_hidden_state
-    return torch.max(feat, dim=1).values.squeeze().cpu().numpy()
+    return feat.squeeze(0).cpu().numpy()
 
 def extract_text_feature(text_path):
     try:
@@ -90,7 +90,7 @@ def extract_text_feature(text_path):
                                max_length=512, padding="max_length").to(device)
     with torch.no_grad():
         feat = roberta_model(**inputs).last_hidden_state
-    return torch.max(feat, dim=1).values.squeeze().cpu().numpy()
+    return feat.squeeze(0).cpu().numpy()
 
 def batch_extract_features():
     users = set(f.split("_")[0] for f in os.listdir(BASE_DIR))
@@ -113,3 +113,9 @@ def batch_extract_features():
 if __name__ == "__main__":
     print('Starting feature extraction...')
     batch_extract_features()
+    # vs = extract_visual_feature('/home/orisu/avi2026/dataset/train_data/5a03d20a7ecfc50001be0a7a_q1_generic.mp4')
+    # a = extract_audio_feature('/home/orisu/avi2026/dataset/autodl-tmp/train_audio/5a03d20a7ecfc50001be0a7a_q1.wav')
+    # t = extract_text_feature('/home/orisu/avi2026/dataset/autodl-tmp/train_text/5a03d20a7ecfc50001be0a7a_q1.txt')
+    # print("Visual feature shape:", vs.shape)
+    # print("Audio feature shape:", a.shape)
+    # print("Text feature shape:", t.shape)

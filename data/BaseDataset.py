@@ -73,27 +73,14 @@ def load_features_and_labels_task2(base_dir: str, feature_dir: str, label_file: 
         labels_task2 = [float(x) for x in labels_task2]
     return data_task2, labels_task2
 
- 
-class BaseDatasetTask1(Dataset):
-    def __init__(self, base_dir: str, feature_dir: str, label_file: str):
-        data, label = load_features_and_labels_task1(base_dir, feature_dir, label_file)
+class BaseDataset(Dataset):
+    def __init__(self, data, label):
         self.data = data
         self.labels = label
-
+        
+        
     def __len__(self):
         return len(self.data)
 
-    def __getitem__(self, idx, type: str):
-        return self.data[type][idx], self.labels[type][idx]
-    
-class BaseDatasetTask2(Dataset):
-    def __init__(self, base_dir: str, feature_dir: str, label_file: str):
-        data, label = load_features_and_labels_task2(base_dir, feature_dir, label_file)
-        self.data = data
-        self.labels = label
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
         return self.data[idx], self.labels[idx]
