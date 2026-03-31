@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-from data_utils import load_features_and_labels
+from hau.AVI2026_baseline.Baseline.data_utils import load_features_and_labels
 
 import random
 
@@ -26,7 +26,7 @@ def set_seed(seed: int = 42):
 # 设置全局随机种子
 set_seed(42)
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 TASK1_QS = ["q3", "q4", "q5", "q6"]
 TASK2_QS = ["q1", "q2", "q3", "q4", "q5", "q6"]
 
@@ -73,39 +73,43 @@ if __name__=="__main__":
 
     data_task1, labels_task1, data_task2, labels_task2 = load_features_and_labels()
 
+    print("labels_task1:", labels_task1[0])
+    exit()
     # Task1
-    print("\n=== Task1: 人格回归训练 ===")
-    task1_models = {}
-    for idx, q in enumerate(TASK1_QS):
-        X = data_task1[q]
-        y = labels_task1[q]
-        model = PersonalityRegressor().to(device)
-        criterion = nn.MSELoss()
-        optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    # print("\n=== Task1: 人格回归训练 ===")
+    # task1_models = {}
+    # for idx, q in enumerate(TASK1_QS):
+    #     X = data_task1[q]
+    #     y = labels_task1[q]
+    #     model = PersonalityRegressor().to(device)
+    #     criterion = nn.MSELoss()
+    #     optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
-        Xv = torch.tensor(np.stack([f["visual"] for f in X]), dtype=torch.float32).to(device)
-        Xa = torch.tensor(np.stack([f["audio"]  for f in X]), dtype=torch.float32).to(device)
-        Xt = torch.tensor(np.stack([f["text"]   for f in X]), dtype=torch.float32).to(device)
-        Y  = torch.tensor(y, dtype=torch.float32).unsqueeze(1).to(device)
+    #     Xv = torch.tensor(np.stack([f["visual"] for f in X]), dtype=torch.float32).to(device)
+    #     Xa = torch.tensor(np.stack([f["audio"]  for f in X]), dtype=torch.float32).to(device)
+    #     Xt = torch.tensor(np.stack([f["text"]   for f in X]), dtype=torch.float32).to(device)
+    #     Y  = torch.tensor(y, dtype=torch.float32).unsqueeze(1).to(device)
 
-        model.train()
-        for epoch in range(200):
-            optimizer.zero_grad()
-            output = model(Xv,Xa,Xt)
-            loss = criterion(output,Y)
-            loss.backward()
-            optimizer.step()
-            if epoch%10==0:
-                print(f"{q} Epoch {epoch} | MSE Loss: {loss.item():.6f}")
+    #     model.train()
+    #     for epoch in range(200):
+    #         optimizer.zero_grad()
+    #         output = model(Xv,Xa,Xt)
+    #         loss = criterion(output,Y)
+    #         loss.backward()
+    #         optimizer.step()
+    #         if epoch%10==0:
+    #             print(f"{q} Epoch {epoch} | MSE Loss: {loss.item():.6f}")
 
-        task1_models[q] = model
-        torch.save(model.state_dict(), f"./trained_models/task1_{q}.pth")
+    #     task1_models[q] = model
+    #     torch.save(model.state_dict(), f"./trained_models/task1_{q}.pth")
 
     # Task2
     print("\n=== Task2: 认知分类训练 ===")
-    
+    print('labels_task2: ', len(labels_task2))
+    print('data_task2: ', set(labels_task2))
     level_map = {"low":0,"normal":1,"high":2}
-    Y2 = [level_map[label] for label in labels_task2]
+    # Y2 = [level_map[label] for label in labels_task2]
+    Y2  = labels_task2
     
     # 构建 tensor（N 用户 × 18 个特征）
     # 每个用户有 6 个问题 × 3 个模态 = 18 个 feature
@@ -123,6 +127,8 @@ if __name__=="__main__":
         X2_batch.append(torch.stack([X2_tensor_list[j][i] for j in range(batch_size)], dim=0).to(device))
     
     Y2_tensor = torch.tensor(Y2, dtype=torch.long).to(device)
+    Y2_tensor = Y2_tensor - 1 # force labels to be 0,1,2
+    print('Y2_tensor: ', Y2_tensor.shape)
     
     model2 = CognitiveClassifier().to(device)
     criterion2 = nn.CrossEntropyLoss()

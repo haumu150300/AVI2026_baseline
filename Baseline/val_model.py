@@ -2,12 +2,12 @@ import os
 import torch
 import numpy as np
 import pandas as pd
-from train_model import PersonalityRegressor, CognitiveClassifier, TASK1_QS, TASK2_QS
+from hau.AVI2026_baseline.Baseline.train_model import PersonalityRegressor, CognitiveClassifier, TASK1_QS, TASK2_QS
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-FEATURE_DIR = "./val_feature"  # 验证集特征目录
-VAL_CSV = "./val_data.csv"
+FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/val_feature"  # 验证集特征目录
+VAL_CSV = "/home/orisu/avi2026/dataset/val_data.csv"
 
 # ====================== 加载验证集数据 ======================
 def load_val_features_and_labels():
@@ -52,7 +52,8 @@ def load_val_features_and_labels():
             f = feats[q]
             task2_feat.extend([f["visual"], f["audio"], f["text"]])
         data_task2.append(task2_feat)
-        labels_task2.append(level_map[row['g_level']])  # 保持你原来的列名
+        # labels_task2.append(level_map[row['g_level']])  # 保持你原来的列名
+        labels_task2.append(row['g_level'])  # 保持你原来的列名
     return data_task1, labels_task1, data_task2, labels_task2
 
 

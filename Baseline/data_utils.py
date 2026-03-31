@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 
-FEATURE_DIR = "/home/orisu/avi2026/dataset/train_feature"
+FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/train_feature"
 BASE_DIR = "/home/orisu/avi2026/dataset/train_data"
 LABEL_FILE = "/home/orisu/avi2026/dataset/train_data.csv"
 TASK1_QS = ["q3", "q4", "q5", "q6"]
@@ -39,6 +39,7 @@ def load_features_and_labels():
             label = df[df["id"]==user][label_col].values[0]
             data_task1[q].append(feats[q])
             labels_task1[q].append(label)
+        
         # Task2
         task2_feat = []
         for q in TASK2_QS:
@@ -46,4 +47,7 @@ def load_features_and_labels():
             task2_feat.extend([f["visual"], f["audio"], f["text"]])
         data_task2.append(task2_feat)
         labels_task2.append(df[df["id"]==user]["g_level"].values[0])
+        labels_task2 = [float(x) for x in labels_task2]
     return data_task1, labels_task1, data_task2, labels_task2
+
+ 

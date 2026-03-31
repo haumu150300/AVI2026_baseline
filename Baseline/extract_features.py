@@ -10,11 +10,11 @@ warnings.filterwarnings('ignore')
 
 # 基础配置
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
-BASE_DIR = "/home/orisu/avi2026/dataset/train_data"
+BASE_DIR = "/home/orisu/avi2026/dataset/val_data"
 BASE_VIDEO_DIR = BASE_DIR
-BASE_AUDIO_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/train_audio"
-BASE_TEXT_DIR  = "/home/orisu/avi2026/dataset/autodl-tmp/train_text"
-FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/train_feature"
+BASE_AUDIO_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/val_audio"
+BASE_TEXT_DIR  = "/home/orisu/avi2026/dataset/autodl-tmp/val_text"
+FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/val_feature"
 os.makedirs(os.path.join(FEATURE_DIR, "video"), exist_ok=True)
 os.makedirs(os.path.join(FEATURE_DIR, "audio"), exist_ok=True)
 os.makedirs(os.path.join(FEATURE_DIR, "text"), exist_ok=True)

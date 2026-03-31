@@ -6,10 +6,10 @@ from transformers import WhisperProcessor, WhisperForConditionalGeneration
 import numpy as np
 
 # ====================== 配置 ======================
-BASE_DIR = "/home/orisu/avi2026/dataset/train_data"       # 原始视频文件夹
+BASE_DIR = "/home/orisu/avi2026/dataset/val_data"       # 原始视频文件夹
 SAVE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp"            # 保存音频和文本的根文件夹
-AUDIO_DIR = os.path.join(SAVE_DIR, "train_audio")
-TEXT_DIR = os.path.join(SAVE_DIR, "train_text")
+AUDIO_DIR = os.path.join(SAVE_DIR, "val_audio")
+TEXT_DIR = os.path.join(SAVE_DIR, "val_text")
 os.makedirs(AUDIO_DIR, exist_ok=True)
 os.makedirs(TEXT_DIR, exist_ok=True)
 
