@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 
-FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/train_feature"
+FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp1/train_feature"
 BASE_DIR = "/home/orisu/avi2026/dataset/train_data"
 LABEL_FILE = "/home/orisu/avi2026/dataset/train_data.csv"
 TASK1_QS = ["q3", "q4", "q5", "q6"]
@@ -27,10 +27,11 @@ def load_features_and_labels():
                 skip_user = True
                 break
             feats[q] = {
-                "visual": np.load(v_path),
-                "audio": np.load(a_path),
+                "visual": np.load(v_path).mean(axis=0),  # 对视觉特征取平均，得到固定长度的向量
+                "audio": np.load(a_path).squeeze(), 
                 "text": np.load(t_path)
             }
+            
         if skip_user:
             continue
         # Task1

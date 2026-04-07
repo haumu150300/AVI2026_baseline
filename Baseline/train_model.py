@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-from hau.AVI2026_baseline.Baseline.data_utils import load_features_and_labels
-
+from data_utils import load_features_and_labels
+import torch.nn.functional as F
 import random
 
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
@@ -30,9 +30,67 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 TASK1_QS = ["q3", "q4", "q5", "q6"]
 TASK2_QS = ["q1", "q2", "q3", "q4", "q5", "q6"]
 
-# ====================== 模型定义 ======================
+# ------------------------------
+# Personality Regressor (Expert)
+# ------------------------------
+class Residual(nn.Module):
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x, *args, **kwargs):
+        return self.fn(x, *args, **kwargs) + x
+
+
+class PreNorm(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.fn = fn
+        self.norm = nn.LayerNorm(dim)
+
+    def forward(self, x):
+        x = self.norm(x)
+        return self.fn(x)
+    
+class Attention(nn.Module):
+    def __init__(self, dim, heads=8):
+        super().__init__()
+        self.attn = nn.MultiheadAttention(dim, heads, batch_first=True)
+
+    def forward(self, x):
+        attn_output, _ = self.attn(x, x, x)
+        return attn_output
+    
 class PersonalityRegressor(nn.Module):
-    def __init__(self, visual_dim=512, audio_dim=512, text_dim=768, hidden_dims=[256,128], num_heads=5):
+    def __init__(self, input_dim, hidden_dims=[128, 64], num_heads=1):
+        super().__init__()
+        # self.fusion = nn.Linear(input_dim, hidden_dims[0])
+         
+        self.fusion = Residual(PreNorm(input_dim, Attention(input_dim, 8)))
+        self.hidden_layers = nn.Sequential(
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(hidden_dims[0], hidden_dims[1]),
+            nn.ReLU(),
+            nn.Dropout(0.5)
+        )
+        self.heads = nn.ModuleList([nn.Linear(hidden_dims[1], 1) for _ in range(num_heads)])
+
+    def add_noise(self, x, std=0.01):
+        noise = torch.randn_like(x) * std
+        return x + noise
+    
+
+    def forward(self, x):
+        x = self.add_noise(x, std=0.001)
+        x = self.fusion(x)
+        x = self.hidden_layers(x)
+        outputs = [head(x) for head in self.heads]
+        return torch.mean(torch.stack(outputs, dim=0), dim=0)  # (batch, 1)
+
+
+class PersonalityRegressorDefault(nn.Module):
+    def __init__(self, visual_dim=768, audio_dim=1024, text_dim=768, hidden_dims=[256,128], num_heads=5):
         super().__init__()
         self.fusion = nn.Linear(visual_dim + audio_dim + text_dim, hidden_dims[0])
         self.hidden_layers = nn.Sequential(
@@ -48,9 +106,33 @@ class PersonalityRegressor(nn.Module):
         x = self.hidden_layers(x)
         outputs = [head(x) for head in self.heads]
         return torch.mean(torch.stack(outputs, dim=0), dim=0)
+# ------------------------------
+# Mixture of Experts Model
+# ------------------------------
+class PersonalityMoe(nn.Module):
+    def __init__(self, device):
+        super().__init__()
+        # Learnable mixture weights (optional softmax for stability)
+        # self.weights = nn.Parameter(torch.tensor([0.2, 0.2, 0.6], dtype=torch.float32))  
 
+        self.expert_v = PersonalityRegressor(512).to(device)
+        self.expert_a = PersonalityRegressor(512).to(device)
+        self.expert_t = PersonalityRegressor(768).to(device)
+
+    def forward(self, v, a, t):
+        out_v = self.expert_v(v)  # (batch, 1)
+        out_a = self.expert_a(a)
+        out_t = self.expert_t(t)
+
+        # Normalize weights to sum=1
+        # w = F.softmax(self.weights, dim=0)
+        # output = w[0]*out_v + w[1]*out_a + w[2]*out_t
+        # return output.squeeze(-1)  # (batch,)
+        return (out_v + out_a + out_t) / 3.0  # 简单平均
+
+    
 class CognitiveClassifier(nn.Module):
-    def __init__(self, visual_dim=512, audio_dim=512, text_dim=768, hidden_dims=[512,256], num_heads=3):
+    def __init__(self, visual_dim=768, audio_dim=1024, text_dim=768, hidden_dims=[512,256], num_heads=3):
         super().__init__()
         self.single_fusion = nn.Linear(visual_dim+audio_dim+text_dim, hidden_dims[0])
         self.global_fusion = nn.Linear(hidden_dims[0]*6, hidden_dims[1])
@@ -73,35 +155,41 @@ if __name__=="__main__":
 
     data_task1, labels_task1, data_task2, labels_task2 = load_features_and_labels()
 
-    print("labels_task1:", labels_task1[0])
-    exit()
     # Task1
-    # print("\n=== Task1: 人格回归训练 ===")
-    # task1_models = {}
-    # for idx, q in enumerate(TASK1_QS):
-    #     X = data_task1[q]
-    #     y = labels_task1[q]
-    #     model = PersonalityRegressor().to(device)
-    #     criterion = nn.MSELoss()
-    #     optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    print("\n=== Task1: 人格回归训练 ===")
+    
+    task1_models = {}
+    for idx, q in enumerate(TASK1_QS):
+        X = data_task1[q]
+        y = labels_task1[q]
+        model = PersonalityRegressorDefault()
+        model.to(device)
+        
+        # print architecture and parameter is trainable
+        # print(f"\nModel architecture for {q}:")
+        # for name, param in model.named_parameters():
+        #     print(f"{name}: requires_grad={param.requires_grad}, shape={param.shape}")
+        # exit()
+        
+        criterion = nn.MSELoss()
+        optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
-    #     Xv = torch.tensor(np.stack([f["visual"] for f in X]), dtype=torch.float32).to(device)
-    #     Xa = torch.tensor(np.stack([f["audio"]  for f in X]), dtype=torch.float32).to(device)
-    #     Xt = torch.tensor(np.stack([f["text"]   for f in X]), dtype=torch.float32).to(device)
-    #     Y  = torch.tensor(y, dtype=torch.float32).unsqueeze(1).to(device)
+        Xv = torch.tensor(np.stack([f["visual"] for f in X]), dtype=torch.float32).to(device)
+        Xa = torch.tensor(np.stack([f["audio"]  for f in X]), dtype=torch.float32).to(device)
+        Xt = torch.tensor(np.stack([f["text"]   for f in X]), dtype=torch.float32).to(device)
+        Y  = torch.tensor(y, dtype=torch.float32).unsqueeze(1).to(device)
 
-    #     model.train()
-    #     for epoch in range(200):
-    #         optimizer.zero_grad()
-    #         output = model(Xv,Xa,Xt)
-    #         loss = criterion(output,Y)
-    #         loss.backward()
-    #         optimizer.step()
-    #         if epoch%10==0:
-    #             print(f"{q} Epoch {epoch} | MSE Loss: {loss.item():.6f}")
-
-    #     task1_models[q] = model
-    #     torch.save(model.state_dict(), f"./trained_models/task1_{q}.pth")
+        model.train()
+        for epoch in range(500):
+            optimizer.zero_grad()
+            output = model(Xv, Xa, Xt)
+            loss = criterion(output,Y)
+            loss.backward()
+            optimizer.step()
+            if epoch%10==0:
+                print(f"{q} Epoch {epoch} | MSE Loss: {loss.item():.6f}")
+        task1_models[q] = model
+        torch.save(model.state_dict(), f"./trained_models/task1_{q}.pth")
 
     # Task2
     print("\n=== Task2: 认知分类训练 ===")
@@ -134,7 +222,7 @@ if __name__=="__main__":
     criterion2 = nn.CrossEntropyLoss()
     optimizer2 = optim.Adam(model2.parameters(), lr=1e-4)
     
-    num_epochs = 200
+    num_epochs = 500
     for epoch in range(num_epochs):
         optimizer2.zero_grad()
         output = model2(*X2_batch)  # [N, 3]

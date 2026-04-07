@@ -4,29 +4,38 @@ import torch
 import numpy as np
 import librosa
 import warnings
-from transformers import CLIPProcessor, CLIPModel, WhisperProcessor, WhisperModel, RobertaTokenizer, RobertaModel
+from transformers import (
+    ViTImageProcessor, ViTModel,
+    ClapModel, ClapProcessor,
+    BertTokenizer, BertModel,
+)
 
 warnings.filterwarnings('ignore')
 
 # 基础配置
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+device = "cuda:1" if torch.cuda.is_available() else "cpu"
 BASE_DIR = "/home/orisu/avi2026/dataset/val_data"
 BASE_VIDEO_DIR = BASE_DIR
 BASE_AUDIO_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/val_audio"
 BASE_TEXT_DIR  = "/home/orisu/avi2026/dataset/autodl-tmp/val_text"
-FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/val_feature_token"
+FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp2/val_feature"
 os.makedirs(os.path.join(FEATURE_DIR, "video"), exist_ok=True)
 os.makedirs(os.path.join(FEATURE_DIR, "audio"), exist_ok=True)
 os.makedirs(os.path.join(FEATURE_DIR, "text"), exist_ok=True)
 TASK2_QS = ["q1", "q2", "q3", "q4", "q5", "q6"]
 
 # 模型加载
-clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
-whisper_processor = WhisperProcessor.from_pretrained("openai/whisper-base")
-whisper_model = WhisperModel.from_pretrained("openai/whisper-base").to(device)
-roberta_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
-roberta_model = RobertaModel.from_pretrained("roberta-base").to(device)
+img_model = 'mo-thecreator/vit-Facial-Expression-Recognition'
+clip_processor = ViTImageProcessor.from_pretrained(img_model)
+clip_model = ViTModel.from_pretrained(img_model).to(device)
+
+audio_model = 'laion/clap-htsat-fused'
+whisper_processor = ClapProcessor.from_pretrained(audio_model)
+whisper_model = ClapModel.from_pretrained(audio_model).to(device)
+
+text_model = 'Minej/bert-base-personality'
+roberta_tokenizer = BertTokenizer.from_pretrained(text_model)
+roberta_model = BertModel.from_pretrained(text_model).to(device)
 
 # ====================== 工具函数 ======================
 def extract_keyframes(video_path, fps=1):
@@ -69,15 +78,21 @@ def extract_visual_feature(video_path):
     frames = extract_keyframes(video_path)
     inputs = clip_processor(images=frames, return_tensors="pt").to(device)
     with torch.no_grad():
-        feat = clip_model.get_image_features(**inputs)
-    return feat.cpu().numpy()
+        feat = clip_model(**inputs).last_hidden_state
+        # print(f"Extracted visual features shape: {feat.shape}")
+    return torch.max(feat, dim=0).values.cpu().numpy()
 
 def extract_audio_feature(audio_path):
     waveform, sr = librosa.load(audio_path, sr=16000)
-    inputs = whisper_processor(waveform, sampling_rate=16000, return_tensors="pt").to(device)
+    inputs = whisper_processor(waveform, sampling_rate=16000)
+    inputs =  inputs['input_values'][0]
+    inputs = inputs.reshape(1, -1)
+    inputs = torch.tensor(inputs, dtype=torch.float32).to(device)
     with torch.no_grad():
-        feat = whisper_model.encoder(**inputs).last_hidden_state
-    return feat.squeeze(0).cpu().numpy()
+        feat = whisper_model(inputs)[0]
+        # print(f"Extracted audio features shape: {feat.shape}")
+        # .last_hidden_state
+    return torch.max(feat, dim=1).values.cpu().numpy()
 
 def extract_text_feature(text_path):
     try:
@@ -90,7 +105,7 @@ def extract_text_feature(text_path):
                                max_length=512, padding="max_length").to(device)
     with torch.no_grad():
         feat = roberta_model(**inputs).last_hidden_state
-    return feat.squeeze(0).cpu().numpy()
+    return torch.max(feat, dim=1).values.squeeze().cpu().numpy()
 
 def batch_extract_features():
     users = set(f.split("_")[0] for f in os.listdir(BASE_DIR))
@@ -112,10 +127,10 @@ def batch_extract_features():
 
 if __name__ == "__main__":
     print('Starting feature extraction...')
-    batch_extract_features()
-    # vs = extract_visual_feature('/home/orisu/avi2026/dataset/train_data/5a03d20a7ecfc50001be0a7a_q1_generic.mp4')
-    # a = extract_audio_feature('/home/orisu/avi2026/dataset/autodl-tmp/train_audio/5a03d20a7ecfc50001be0a7a_q1.wav')
-    # t = extract_text_feature('/home/orisu/avi2026/dataset/autodl-tmp/train_text/5a03d20a7ecfc50001be0a7a_q1.txt')
-    # print("Visual feature shape:", vs.shape)
-    # print("Audio feature shape:", a.shape)
-    # print("Text feature shape:", t.shape)
+    # batch_extract_features()
+    vs = extract_visual_feature('/home/orisu/avi2026/dataset/train_data/5a03d20a7ecfc50001be0a7a_q1_generic.mp4')
+    a = extract_audio_feature('/home/orisu/avi2026/dataset/autodl-tmp/train_audio/5a03d20a7ecfc50001be0a7a_q1.wav')
+    t = extract_text_feature('/home/orisu/avi2026/dataset/autodl-tmp/train_text/5a03d20a7ecfc50001be0a7a_q1.txt')
+    print("Visual feature shape:", vs.shape)
+    print("Audio feature shape:", a.shape)
+    print("Text feature shape:", t.shape)

@@ -2,11 +2,11 @@ import os
 import torch
 import numpy as np
 import pandas as pd
-from hau.AVI2026_baseline.Baseline.train_model import PersonalityRegressor, CognitiveClassifier, TASK1_QS, TASK2_QS
+from train_model import PersonalityRegressorDefault, CognitiveClassifier, TASK1_QS, TASK2_QS
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp/val_feature"  # 验证集特征目录
+FEATURE_DIR = "/home/orisu/avi2026/dataset/autodl-tmp1/val_feature"  # 验证集特征目录
 VAL_CSV = "/home/orisu/avi2026/dataset/val_data.csv"
 
 # ====================== 加载验证集数据 ======================
@@ -32,8 +32,8 @@ def load_val_features_and_labels():
                 skip_user = True
                 break
             feats[q] = {
-                "visual": np.load(v_path),
-                "audio": np.load(a_path),
+                "visual": np.load(v_path).mean(axis=0),
+                "audio": np.load(a_path).squeeze(),
                 "text": np.load(t_path)
             }
         if skip_user:
@@ -61,6 +61,7 @@ def load_val_features_and_labels():
 def evaluate_task1(task1_models, data_task1, labels_task1):
     from sklearn.metrics import mean_squared_error
     print("\n=== Task1 验证集 ===")
+    avg_scores = 0
     for q in TASK1_QS:
         X = data_task1[q]
         y_true = labels_task1[q]
@@ -76,6 +77,9 @@ def evaluate_task1(task1_models, data_task1, labels_task1):
             y_pred = model(Xv,Xa,Xt).cpu().numpy()
         mse = mean_squared_error(y_true, y_pred)
         print(f"{q} MSE: {mse:.6f}")
+        avg_scores += mse
+    avg_scores /= len(TASK1_QS)
+    print(f"Average MSE across Task1: {avg_scores:.6f}")
 
 # ====================== 验证 Task2 ======================
 def evaluate_task2(model2, data_task2, labels_task2):
@@ -102,8 +106,9 @@ if __name__=="__main__":
     # 加载模型
     task1_models = {}
     for q in TASK1_QS:
-        model = PersonalityRegressor().to(device)
+        model = PersonalityRegressorDefault()
         model.load_state_dict(torch.load(f"./trained_models/task1_{q}.pth", map_location=device))
+        model.to(device)
         task1_models[q] = model
 
     model2 = CognitiveClassifier().to(device)
